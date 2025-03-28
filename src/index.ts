@@ -9,7 +9,15 @@ import {AuthMiddleware} from './middleware';
 import { random } from './utils';
 const app = express();
 dotenv.config();
-app.use(cors());
+const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
+app.use(
+  cors({
+    origin: FRONTEND_URL,
+    methods: "GET,POST,PUT,DELETE,OPTIONS",
+    allowedHeaders: "Content-Type, Authorization",
+    credentials: true
+  })
+);
 app.use(express.json());
 app.use(express.urlencoded({extended:true}));
 async function connect(): Promise<void> {
@@ -21,8 +29,7 @@ async function connect(): Promise<void> {
     }
   
     try {
-      await mongoose.connect(mongoURI, {
-      } as mongoose.ConnectOptions);
+      await mongoose.connect(mongoURI);
       console.log("✅ Connected to MongoDB successfully");
     } catch (err) {
       console.error("❌ MongoDB connection error:", err);
@@ -124,55 +131,66 @@ app.delete('/api/v1/content',AuthMiddleware,async(req,res)=>{
       })
 })
  //@ts-ignore
-app.post('/api/v1/brain/share',AuthMiddleware,async(req,res)=>{ 
+app.post('/api/v1/brain/share', AuthMiddleware, async (req, res) => {
   try {
-     //@ts-ignore
+    //@ts-ignore
     const userId = req.userId;
-    const share = req.body.share;
-    if(share){
-        const Link = await shareModel.findOne({
-            userId:userId
-        })
-        if(Link){
-            console.log(Link);
-            const data = Link;
-res.json({
-    message:"link already created",
-    data:data
-})
-        }
-        else{
-         const hash =random(10);
-            await shareModel.create({
-                hash:hash,
-                userId:userId
-            });
-            res.json({
-                message:"Link created successfully",
-                data:hash
-            })
-        }  
-    }
-    else{
-        await shareModel.deleteOne({
-            userId:userId
-        })
-        res.json({
-            message:"link deleted successfully"
-        })
-    }
-  
-  
+    const share  = req.body.share;
+    console.log(share);
+    if(share) 
+    {
+      const existingLink = await shareModel.findOne({ userId });
+      if (existingLink) {
+        console.log(existingLink);
+        return res.json({
+          message: "Link already created",
+          data: existingLink,
+        });
+      } else {
+        const hash = random(10);
+        await shareModel.create({ hash, userId });
+        return res.json({
+          message: "Link created successfully",
+          data: hash,
+        });
+      }
+    } 
   } catch (error) {
-    console.log(error);
+    console.error(error);
+    res.status(500).json({
+      message: "An error occurred while processing your request.",
+    });
   }
-
+});
+ //@ts-ignore
+app.delete('/api/v1/brain/share', AuthMiddleware, async (req, res) => {
+try {
+   //@ts-ignore
+  const userId = req.userId;
+  const share  = req.body.share;
+  if(share){
+    await shareModel.deleteOne({ userId });
+    console.log("deleted");
+    return res.json({
+      message: "Link deleted successfully",
+    });
+  }
+  else{
+    return res.json({
+      message: "bad request",
+    });
+  }
+} catch (error) {
+  console.log(error);
+}
 
 })
 
 app.get('/api/v1/brain/:shareLink',async(req,res)=>{
   try {
-    const hash = req.params.shareLink;
+    const shareLink = String(req.params.shareLink || '');
+    const hash = shareLink.split('').filter((value:any,index:any)=>index>1).join('');
+    console.log(hash);
     const Link = await shareModel.findOne({
         hash:hash,
     })

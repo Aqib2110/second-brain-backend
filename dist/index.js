@@ -34,7 +34,7 @@ function connect() {
             process.exit(1);
         }
         try {
-            yield mongoose_1.default.connect(mongoURI, {});
+            yield mongoose_1.default.connect(mongoURI);
             console.log("✅ Connected to MongoDB successfully");
         }
         catch (err) {
@@ -138,36 +138,49 @@ app.post('/api/v1/brain/share', middleware_1.AuthMiddleware, (req, res) => __awa
         //@ts-ignore
         const userId = req.userId;
         const share = req.body.share;
+        console.log(share);
         if (share) {
-            const Link = yield db_1.shareModel.findOne({
-                userId: userId
-            });
-            if (Link) {
-                console.log(Link);
-                const data = Link;
-                res.json({
-                    message: "link already created",
-                    data: data
+            const existingLink = yield db_1.shareModel.findOne({ userId });
+            if (existingLink) {
+                console.log(existingLink);
+                return res.json({
+                    message: "Link already created",
+                    data: existingLink,
                 });
             }
             else {
                 const hash = (0, utils_1.random)(10);
-                yield db_1.shareModel.create({
-                    hash: hash,
-                    userId: userId
-                });
-                res.json({
+                yield db_1.shareModel.create({ hash, userId });
+                return res.json({
                     message: "Link created successfully",
-                    data: hash
+                    data: hash,
                 });
             }
         }
-        else {
-            yield db_1.shareModel.deleteOne({
-                userId: userId
+    }
+    catch (error) {
+        console.error(error);
+        res.status(500).json({
+            message: "An error occurred while processing your request.",
+        });
+    }
+}));
+//@ts-ignore
+app.delete('/api/v1/brain/share', middleware_1.AuthMiddleware, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        //@ts-ignore
+        const userId = req.userId;
+        const share = req.body.share;
+        if (share) {
+            yield db_1.shareModel.deleteOne({ userId });
+            console.log("deleted");
+            return res.json({
+                message: "Link deleted successfully",
             });
-            res.json({
-                message: "link deleted successfully"
+        }
+        else {
+            return res.json({
+                message: "bad request",
             });
         }
     }
@@ -177,7 +190,9 @@ app.post('/api/v1/brain/share', middleware_1.AuthMiddleware, (req, res) => __awa
 }));
 app.get('/api/v1/brain/:shareLink', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const hash = req.params.shareLink;
+        const shareLink = String(req.params.shareLink || '');
+        const hash = shareLink.split('').filter((value, index) => index > 1).join('');
+        console.log(hash);
         const Link = yield db_1.shareModel.findOne({
             hash: hash,
         });
